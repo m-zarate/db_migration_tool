@@ -1,0 +1,1 @@
+alter table test_users_table add last_name varchar(80) not null default '';

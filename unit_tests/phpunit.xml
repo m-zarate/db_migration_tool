@@ -1,0 +1,7 @@
+<phpunit bootstrap="" stopOnFailure="true">
+<testsuites>
+    <testsuite name="General test suite">
+        <directory>./tests</directory>
+    </testsuite>
+</testsuites>
+</phpunit>
