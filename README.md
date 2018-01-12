@@ -15,3 +15,8 @@ To verify how an erroneous command and transactions behave:
 2.  rerun the migration tool (php run.php).
 3.  verify the tool reports an error w/the insert statement in file #4.
 4.  also verify that the new president data in the prior sql command didn't make it into it's target table due to the entire file being rolled back.
+
+Things to be aware of:
+
+1.  Since the tool delimits sql commands with semicolons, it can not handle 
+semicolons within queries (e.g. within a quoted string).
