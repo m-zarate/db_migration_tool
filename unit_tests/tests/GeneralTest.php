@@ -17,7 +17,20 @@ use PHPUnit\Framework\TestCase;
 class GeneralTest extends TestCase
 {
     private $pathToSampleScripts = '../sample_sql_change_scripts';
-    private $pathToChangeScripts = '../sql_change_scripts/'.DB_DELTA_SET;
+    private $pathToChangeScripts = '../sql_change_scripts/'.CHANGE_SET;
+    
+    /**
+     * @var $gitPlaceholderFile A placeholder file in an empty dir, b/c git 
+     * won't check-in empty directories.
+     */
+    private $gitPlaceholderFile = 'for_git.txt';
+    
+    private $changeScripts = [
+        '1.2018-01-12.10:16:32.add_user_table.sql',
+        '2.2018-01-12.10:17:22.add_last_name_to_user_table',
+        '3.2018-01-12.10:19:01.seed_users',
+        '4.2018-01-12.10:26:32.this_should_error_on_purose'
+    ];
     
     public function __construct()
     {
@@ -47,14 +60,18 @@ class GeneralTest extends TestCase
                 continue;
             }
             
-            unlink($this->pathToChangeScripts.'/'.$existingFile);
+            if($existingFile != $this->gitPlaceholderFile)
+            {
+                unlink($this->pathToChangeScripts.'/'.$existingFile);    
+            }
 		}
         
         $existingFilesAfter = scandir($this->pathToChangeScripts);        
         foreach($existingFilesAfter as $existingFile)
 		{
-            $this->assertTrue(in_array($existingFile, array('.', '..')), 'Test '
-                .'for empty directory failed, file name '.$existingFile.' was found.');
+            $this->assertTrue(in_array($existingFile, 
+                array('.', '..', $this->gitPlaceholderFile)), 'Test for empty '
+                . 'directory failed, file name '.$existingFile.' was found.');
         }
         
         #
@@ -101,8 +118,8 @@ class GeneralTest extends TestCase
         # We currently have no sql change scripts to run, so we'll create done by 
         # copying the first sample change script to the change script directory.
         #                
-        copy($this->pathToSampleScripts.'/1.add_user_table.sql', $this->pathToChangeScripts.'/1.add_user_table.sql');        
-        $this->assertTrue(file_exists($this->pathToChangeScripts.'/1.add_user_table.sql'), 
+        copy($this->pathToSampleScripts.'/'.$this->changeScripts[0], $this->pathToChangeScripts.'/'.$this->changeScripts[0]);
+        $this->assertTrue(file_exists($this->pathToChangeScripts.'/'.$this->changeScripts[0]), 
             'First sample change script did not copy properly!');
         
         #
@@ -139,8 +156,8 @@ class GeneralTest extends TestCase
         #
         # Now copy our sample sql file and run the db updater ...
         #
-        copy($this->pathToSampleScripts.'/1.add_user_table.sql', $this->pathToChangeScripts.'/1.add_user_table.sql');        
-        $this->assertTrue(file_exists($this->pathToChangeScripts.'/1.add_user_table.sql'), 
+        copy($this->pathToSampleScripts.'/'.$this->changeScripts[0], $this->pathToChangeScripts.'/'.$this->changeScripts[0]);        
+        $this->assertTrue(file_exists($this->pathToChangeScripts.'/'.$this->changeScripts[0]), 
             'First sample change script did not copy properly!');        
         exec('cd .. && php run.php');
         

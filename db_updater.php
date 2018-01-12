@@ -16,7 +16,7 @@ class DbUpdater
      * some point you might have 100 change scripts, and therefore it may be 
      * preferable to start a new group of change scripts.
      */
-    private $deltaSet = 'v1';
+    private $deltaSet;
     
     /**
      * @var $updateFilesDirectory string
@@ -42,7 +42,10 @@ class DbUpdater
     
     public function __construct()
     {
-        $this->db = new PDO('mysql:dbname='.DB_NAME.';host='.DB_HOST, DB_USERNAME, DB_PASSWORD);        
+        $this->db = new PDO('mysql:dbname='.DB_NAME.';host='.DB_HOST, DB_USERNAME, DB_PASSWORD); 
+        
+        $this->deltaSet = CHANGE_SET;
+        
         $this->updateFilesDirectory = './sql_change_scripts/'.$this->deltaSet;
     }
     
@@ -55,16 +58,10 @@ class DbUpdater
         $this->runUpdates();
         
         $this->outputResult();
-    }       
+    }
     
-    /**
-     * @description Queries the max change_number from the db_change_log table.  
-     * The db updater will treat any change scripts with a number prefix greater
-     * than this as new files to run.  E.g. if the last update to run was update
-     * #7, any files found with a change number >= 8 will be executed.
-     */
-	private function setLatestChangeNumber()
-	{
+    public function getLatestChangeNumber()
+    {
 		$sql =
 		"
 		select max(change_number) as last_update_number
@@ -87,6 +84,19 @@ class DbUpdater
 		{
 			$this->lastChangeNumber = $row['last_update_number'];
 		}
+        
+        return $this->lastChangeNumber;
+    }
+
+    /**
+     * @description Queries the max change_number from the db_change_log table.  
+     * The db updater will treat any change scripts with a number prefix greater
+     * than this as new files to run.  E.g. if the last update to run was update
+     * #7, any files found with a change number >= 8 will be executed.
+     */
+	private function setLatestChangeNumber()
+	{
+        $this->lastChangeNumber = $this->getLatestChangeNumber();
     }
     
     /**     
@@ -102,7 +112,7 @@ class DbUpdater
 		foreach($existingFiles as $existingFile)
 		{
             #
-            # B/c we don't want to operate on the relative path entries ...
+            # B/c we don't want to operate on path entries ...
             #
             if($existingFile == '.' || $existingFile == '..')
 			{
@@ -125,7 +135,7 @@ class DbUpdater
         if(!empty($this->newFiles))
         {
             ksort($this->newFiles);    
-        }	
+        }
 	}    
     
     /**
@@ -177,7 +187,7 @@ class DbUpdater
             ";
             $stmt = $this->db->prepare($sql);
             $stmt->bindParam(':change_number', $changeNumber);
-            $stmt->bindParam(':delta_set', $this->deltaSet);
+            $stmt->bindParam(':delta_set', $this->deltaSet);            
             $stmt->bindParam(':filename', $newFile);
             $stmt->execute();            
 
@@ -194,7 +204,7 @@ class DbUpdater
     {
         $numUpdateFilesRan = count($this->newFiles);
 
-		$output = 'DB Updater ran on database '.DB_NAME.'...'.PHP_EOL;
+		$output = 'DB Updater ran on database '.DB_NAME.PHP_EOL;
 
         if($numUpdateFilesRan === 0)
         {
