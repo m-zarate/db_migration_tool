@@ -40,6 +40,14 @@ class DbUpdater
      */
     private $newFiles = [];    
     
+    /**
+     * @var $gitPlaceholderFile A placeholder file in an empty dir, b/c git 
+     * won't check-in empty directories.  This is currently only needed for unit
+     * tests and any empty change set directories we want to check in.
+     */
+    private $gitPlaceholderFile = 'for_git.txt';
+
+    
     public function __construct()
     {
         $this->db = new PDO('mysql:dbname='.DB_NAME.';host='.DB_HOST, DB_USERNAME, DB_PASSWORD); 
@@ -114,17 +122,22 @@ class DbUpdater
             #
             # B/c we don't want to operate on path entries ...
             #
-            if($existingFile == '.' || $existingFile == '..')
+            if($existingFile == '.' || $existingFile == '..' || $existingFile == $this->gitPlaceholderFile)
 			{
                 continue;
             }
             
             $fileNamePieces = explode('.', $existingFile);
             $fileNumber = $fileNamePieces[0];
+            $fileDate = $fileNamePieces[1];
+            $fileTime = $fileNamePieces[2];
 
             if($fileNumber > $this->lastChangeNumber)
             {                    
-                $this->newFiles[$fileNumber] = $existingFile;
+                $this->newFiles[$fileNumber] = [
+                    'change_timestamp' => $fileDate.'.'.$fileTime,
+                    'filename' => $existingFile
+                ];
             }		
 		}
         
@@ -150,7 +163,7 @@ class DbUpdater
 
 		foreach($this->newFiles as $changeNumber => $newFile)
 		{
-			$sql = file_get_contents($this->updateFilesDirectory.'/'.$newFile);
+			$sql = file_get_contents($this->updateFilesDirectory.'/'.$newFile['filename']);
 			$sqlCommands = explode(';', $sql);
 
 			$this->db->beginTransaction();
@@ -173,7 +186,7 @@ class DbUpdater
                 #
                 if($this->db->exec($sqlCommand) === false)
                 {
-                    print "Sql update file failed (".$newFile."): ".$this->db->errorInfo()[2].PHP_EOL.PHP_EOL;
+                    print "Sql update file failed (".$newFile['filename']."): ".$this->db->errorInfo()[2].PHP_EOL.PHP_EOL;
                     $this->db->rollback();
                     print "All statements within this file have been rolled back.".PHP_EOL.PHP_EOL;
                     exit;
@@ -182,14 +195,26 @@ class DbUpdater
             
             $sql =
             "
-            insert db_change_log (change_number, delta_set, filename)
-            values (:change_number, :delta_set, :filename);
+            insert db_change_log (change_number, change_timestamp, delta_set, filename)
+            values (:change_number, :change_timestamp, :delta_set, :filename);
             ";
+            
+            #
+            # To change "2018-01-12.10:16:32" to "2018-01-12 10:16:32", for database
+            # insertion ...
+            #
+            $changeTimestamp = str_replace('.', ' ', $newFile['change_timestamp']);
+                    
             $stmt = $this->db->prepare($sql);
             $stmt->bindParam(':change_number', $changeNumber);
+            $stmt->bindParam(':change_timestamp', $changeTimestamp);
             $stmt->bindParam(':delta_set', $this->deltaSet);            
-            $stmt->bindParam(':filename', $newFile);
-            $stmt->execute();            
+            $stmt->bindParam(':filename', $newFile['filename']);                        
+            
+            if(!$stmt->execute())
+            {
+                throw new Exception('Select query failed: '.print_r($stmt->errorInfo(), true));
+            }
 
 			$this->db->commit();
 		}
@@ -216,7 +241,7 @@ class DbUpdater
 
             foreach($this->newFiles as $newFile)
             {
-                $output.= $newFile.PHP_EOL;
+                $output.= $newFile['filename'].PHP_EOL;
             }
         }
 
